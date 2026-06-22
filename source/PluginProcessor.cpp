@@ -87,9 +87,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout makeParameters()
         juce::ParameterID {MIX_PARAM_ID, 1}, "Mix", juce::NormalisableRange<float>(0.f, 100.f, 0.1f), 100.f));
 
     parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID {FRAME_SPEED_PARAM_ID, 1}, "Frame speed", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 1.f));
+        juce::ParameterID {FRAME_SPEED_PARAM_ID, 1}, "Speed", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 1.f));
     parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID {SPECTRAL_GHOST_PARAM_ID, 1}, "Spectral ghost", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.f));
+        juce::ParameterID {SPECTRAL_GHOST_PARAM_ID, 1}, "Ghost", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.f));
+    parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID {STUTTER_PARAM_ID, 1}, "Stutter", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.f));
+    parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID {SMOOTH_PARAM_ID, 1}, "Smooth", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.f));
+
+    parameters.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID {SPEED_SYNC_PARAM_ID, 1}, "Speed sync", false));
+    parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID {SPEED_RATE_PARAM_ID, 1}, "Speed rate", juce::NormalisableRange<float>(0.2f, 20.f, 0.001f, 0.4f), 4.f));
+    parameters.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID {SPEED_RATE_SYNCED_PARAM_ID, 1}, "Speed rate (synced)", SYNCED_RATE_DIVISIONS, 4));
+
+    parameters.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID {STUTTER_SYNC_PARAM_ID, 1}, "Stutter sync", false));
+    parameters.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID {STUTTER_RATE_PARAM_ID, 1}, "Stutter rate", juce::NormalisableRange<float>(0.2f, 20.f, 0.001f, 0.4f), 4.f));
+    parameters.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID {STUTTER_RATE_SYNCED_PARAM_ID, 1}, "Stutter rate (synced)", SYNCED_RATE_DIVISIONS, 4));
 
     return {parameters.begin(), parameters.end()};
 }
@@ -342,7 +360,15 @@ void MaimAudioProcessor::processBlockStereo (juce::AudioBuffer<float>& buffer)
     }
 
     if (buffer.getNumSamples() <= estimatedSamplesPerBlock) {
-        codecControllerManager.processBlock(buffer);
+        double bpm = 120.0;
+        if (auto* playHead = getPlayHead()) {
+            if (auto position = playHead->getPosition()) {
+                if (auto detectedBpm = position->getBpm()) {
+                    bpm = *detectedBpm;
+                }
+            }
+        }
+        codecControllerManager.processBlock(buffer, bpm);
     }
 
     for (unsigned i = 0; i < 2; ++i) {
@@ -358,6 +384,12 @@ void MaimAudioProcessor::processBlockStereo (juce::AudioBuffer<float>& buffer)
         buffer.applyGain(postGain);
     }
     dryWetMixer.mixWetSamples(buffer);
+
+    auto finalL = buffer.getReadPointer(0);
+    auto finalR = buffer.getReadPointer(1);
+    for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+        spectrogramDataSource.pushSample(0.5f * (finalL[s] + finalR[s]));
+    }
 }
 
 void MaimAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,

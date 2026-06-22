@@ -31,10 +31,8 @@ private:
     NamedRotarySlider hiSlider;
     NamedRotarySlider makeupSlider;
     NamedRotarySlider mixSlider;
-    NamedRotarySlider frameSpeedSlider;
-    NamedRotarySlider spectralGhostSlider;
 
-    std::array<NamedRotarySlider*, 7> sliders = {&driveSlider, &hiSlider, &loSlider, &makeupSlider, &mixSlider, &frameSpeedSlider, &spectralGhostSlider};
+    std::array<NamedRotarySlider*, 5> sliders = {&driveSlider, &hiSlider, &loSlider, &makeupSlider, &mixSlider};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PostSection)
 };

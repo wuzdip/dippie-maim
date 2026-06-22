@@ -17,7 +17,9 @@
 #include "DragBoxes/ButterflyDragBox.h"
 #include "DragBoxes/SquishFlipDragBox.h"
 #include "NamedRotarySlider.h"
+#include "SpectrogramView.h"
 #include "TiltGraph.h"
+#include "../SpectrogramDataSource.h"
 
 //==============================================================================
 /*
@@ -25,7 +27,7 @@
 class MiscellaneaSection : public StageWindow, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
-    MiscellaneaSection (juce::AudioProcessorValueTreeState& p);
+    MiscellaneaSection (juce::AudioProcessorValueTreeState& p, SpectrogramDataSource& spectrogramSource);
     ~MiscellaneaSection();
     void resized() override;
     void paint (juce::Graphics&) override;
@@ -41,6 +43,7 @@ private:
     juce::Label butterflyLabel;
     ButterflyDragBox butterflyDragBox;
     SquishFlipDragBox mdctDragBox;
+    SpectrogramView spectrogram;
     juce::Rectangle<int> lameOnlySection;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MiscellaneaSection)

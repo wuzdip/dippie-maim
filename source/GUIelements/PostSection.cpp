@@ -19,9 +19,7 @@ PostSection::PostSection(juce::AudioProcessorValueTreeState& p) :
         hiSlider(p, HI_CUT_PARAM_ID, "High"),
         loSlider(p, LO_CUT_PARAM_ID, "Low"),
         makeupSlider(p, MAKEUP_GAIN_PARAM_ID, "Makeup gain"),
-        mixSlider(p, MIX_PARAM_ID,"Dry/Wet"),
-        frameSpeedSlider(p, FRAME_SPEED_PARAM_ID, "Speed"),
-        spectralGhostSlider(p, SPECTRAL_GHOST_PARAM_ID, "Ghost")
+        mixSlider(p, MIX_PARAM_ID,"Dry/Wet")
 {
     driveSlider.slider.setTextValueSuffix(" dB");
     hiSlider.slider.setTextValueSuffix(" Hz");
@@ -34,8 +32,6 @@ PostSection::PostSection(juce::AudioProcessorValueTreeState& p) :
     addAndMakeVisible(loSlider);
     addAndMakeVisible(makeupSlider);
     addAndMakeVisible(mixSlider);
-    addAndMakeVisible(frameSpeedSlider);
-    addAndMakeVisible(spectralGhostSlider);
 }
 
 void PostSection::paint (juce::Graphics& g)

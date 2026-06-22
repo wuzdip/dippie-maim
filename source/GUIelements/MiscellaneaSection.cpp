@@ -11,23 +11,25 @@
 #include "MiscellaneaSection.h"
 #include "../parameterIds.h"
 
-MiscellaneaSection::MiscellaneaSection (juce::AudioProcessorValueTreeState& p)
+MiscellaneaSection::MiscellaneaSection (juce::AudioProcessorValueTreeState& p, SpectrogramDataSource& spectrogramSource)
         : StageWindow(p),
             butterflyDragBox(p, BUTTERFLY_STANDARD_PARAM_ID, BUTTERFLY_CROSSED_PARAM_ID),
-      mdctDragBox(p, MDCT_STEP_PARAM_ID, MDCT_WINDOW_INCREMENT_PARAM_ID)
+      mdctDragBox(p, MDCT_STEP_PARAM_ID, MDCT_WINDOW_INCREMENT_PARAM_ID),
+      spectrogram(spectrogramSource)
 {
     sectionName.setColour(sectionName.textColourId, MaimColours::BEVEL_BLACK);
     sectionName.setFont(sectionNameFont);
-    sectionName.setText("Miscellanea", juce::dontSendNotification);
+    sectionName.setText("Output spectrogram", juce::dontSendNotification);
     sectionName.setJustificationType(juce::Justification::centred);
     lameOnlyLabel.setColour(lameOnlyLabel.textColourId, MaimColours::BEVEL_BLACK);
     lameOnlyLabel.setFont(lameLabelFont);
-    lameOnlyLabel.setText("Slider for Lame\nencoder only", juce::dontSendNotification);
+    lameOnlyLabel.setText("Lame only", juce::dontSendNotification);
     lameOnlyLabel.setJustificationType(juce::Justification::centred);
     butterflyLabel.setColour(sectionName.textColourId, MaimColours::BEVEL_BLACK);
-    butterflyLabel.setFont(sectionNameFont.withHeight(13));
+    butterflyLabel.setFont(sectionNameFont.withHeight(11));
     butterflyLabel.setText("Butterfly", juce::dontSendNotification);
     butterflyLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(spectrogram);
     addAndMakeVisible(butterflyDragBox);
     addAndMakeVisible(mdctDragBox);
     addAndMakeVisible(butterflyLabel);
@@ -77,15 +79,19 @@ void MiscellaneaSection::resized()
     sectionName.setBounds(mainPart.withHeight(titleHeight));
     mainPart = mainPart.withTrimmedTop(titleHeight);
 
-    auto butterflyPart = mainPart.withHeight(mainPart.getHeight() / 2);
-    auto mdctPart = mainPart.withTrimmedTop(butterflyPart.getHeight());
+    auto spectrogramPart = mainPart.withHeight(mainPart.getHeight() * 2 / 3);
+    auto controlsPart = mainPart.withTrimmedTop(spectrogramPart.getHeight() + 5);
 
-    butterflyPart = butterflyPart.withTrimmedBottom(5);
-    mdctPart = mdctPart.withTrimmedTop(5);
+    spectrogram.setBounds(spectrogramPart);
 
-    butterflyDragBox.setBounds(butterflyPart);
-    lameOnlyLabel.setBounds(mdctPart);
-    mdctDragBox.setBounds(mdctPart);
+    auto butterflyPart = controlsPart.withWidth(controlsPart.getWidth() / 2).withTrimmedRight(5);
+    auto mdctPart = controlsPart.withTrimmedLeft(butterflyPart.getWidth() + 5);
+
+    const int labelHeight = 14;
+    butterflyLabel.setBounds(butterflyPart.withHeight(labelHeight));
+    butterflyDragBox.setBounds(butterflyPart.withTrimmedTop(labelHeight));
+    lameOnlyLabel.setBounds(mdctPart.withHeight(labelHeight));
+    mdctDragBox.setBounds(mdctPart.withTrimmedTop(labelHeight));
 }
 
 void MiscellaneaSection::parameterChanged (const juce::String& parameterID, float newValue)

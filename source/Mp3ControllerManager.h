@@ -13,13 +13,16 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_graphics/juce_graphics.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <vector>
 
 #include "CodecControllers/BladeController.h"
 #include "CodecControllers/LameController.h"
 #include "CodecControllers/OpusController.h"
 #include "parameterIds.h"
+#include "RateGate.h"
 
 #define MP3FRAMESIZE 1152
 enum Encoder {
@@ -38,7 +41,7 @@ public:
 
     void initialize(int samplerate, int initialBitrate, int samplesPerBlock);
 
-    void processBlock(juce::AudioBuffer<float>& buffer);
+    void processBlock(juce::AudioBuffer<float>& buffer, double bpm);
     
     int getBitrate();
     
@@ -106,7 +109,30 @@ private:
     std::array<juce::AudioParameterInt*, 20> bandReassignmentParameters;
     juce::AudioProcessorValueTreeState& parameters;
 
-    float frameAccumulator { 1.f };
     float lastDecodedFrame[2][MP3FRAMESIZE] {};
     float ghostFrame[2][MP3FRAMESIZE] {};
+
+    // Speed: tempo-syncable freeze gate. Knob value 1 = always fresh (normal),
+    // 0 = always frozen on lastDecodedFrame, in both free and synced modes.
+    RateGate speedGate;
+    bool prevSpeedFrozen { false };
+
+    // Stutter: tempo-syncable buffer-repeat gate. On entering its "active"
+    // phase, captures a chunk of decoded output and loops it for the rest
+    // of that phase, then releases back to fresh audio.
+    RateGate stutterGate;
+    std::vector<float> stutterCaptureL, stutterCaptureR;
+    int stutterCaptureTarget { 0 };
+    int stutterCapturedLength { 0 };
+    int stutterPlaybackPos { 0 };
+    bool stutterCapturing { false };
+    bool prevStutterActive { false };
+
+    // Smooth: short crossfade applied at Speed/Stutter discontinuity
+    // boundaries, ramping from the previous frame's true tail into the new
+    // frame's content, to avoid audible clicks from the hard frame swaps.
+    static constexpr int maxSmoothRampSamples = 480;
+    float previousOutputTail[2][maxSmoothRampSamples] {};
+    void applySmoothing(float frameOut[2][MP3FRAMESIZE], bool discontinuity);
+    void captureOutputTail(const float frameOut[2][MP3FRAMESIZE]);
 };

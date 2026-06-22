@@ -11,14 +11,15 @@
 #include "MainArea.h"
 
 //==============================================================================
-MainArea::MainArea(juce::AudioProcessorValueTreeState& p) :
+MainArea::MainArea(juce::AudioProcessorValueTreeState& p, SpectrogramDataSource& spectrogramSource) :
     psychoacousticSection(p),
-    miscellaneaSection (p),
+    miscellaneaSection (p, spectrogramSource),
     mdctGraphSection (p),
     postSection(p),
     titlePanel (p),
     reassignmentSection (p, 20, 20),
     opusPacketLossSection(p),
+    glitchFXSection(p),
     parameters(p)
 
 {
@@ -29,6 +30,7 @@ MainArea::MainArea(juce::AudioProcessorValueTreeState& p) :
     addAndMakeVisible(postSection);
     addAndMakeVisible(titlePanel);
     addAndMakeVisible(opusPacketLossSection);
+    addAndMakeVisible(glitchFXSection);
 
     parameters.addParameterListener(ENCODER_PARAM_ID, this);
 
@@ -64,12 +66,16 @@ void MainArea::resized()
     int margin = 10;
     int postSectionWidth = 100;
     int titleHeight = 100;
-    
+    int glitchFXHeight = 150;
+
     auto activeArea = getLocalBounds()
         .withTrimmedTop(margin)
         .withTrimmedLeft(margin)
         .withTrimmedRight(margin)
         .withTrimmedBottom(margin);
+
+    glitchFXSection.setBounds(activeArea.removeFromBottom(glitchFXHeight));
+    activeArea.removeFromBottom(margin);
 
     auto tilesArea = activeArea.withTrimmedRight(postSectionWidth + margin);
     postSection.setBounds(activeArea.withWidth(postSectionWidth).withRightX(activeArea.getRight()));

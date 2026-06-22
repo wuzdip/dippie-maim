@@ -13,11 +13,11 @@
 MaimAudioProcessorEditor::MaimAudioProcessorEditor (MaimAudioProcessor& p) :
         AudioProcessorEditor (&p),
         audioProcessor (p),
-        mainArea(p.getValueTreeState())
+        mainArea(p.getValueTreeState(), p.getSpectrogramDataSource())
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    setSize (800, 500);
+    setSize (800, 660);
     addAndMakeVisible(mainArea);
     setLookAndFeel(&maimLookAndFeel);
 }

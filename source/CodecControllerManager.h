@@ -34,11 +34,11 @@ public:
         mp3ControllerManager.initialize(samplerate, initialBitrate, samplesPerBlock);
     }
     
-    void processBlock(juce::AudioBuffer<float>& block) {
+    void processBlock(juce::AudioBuffer<float>& block, double bpm) {
         if (encoderType == use_opus) {
             opusController.processBlock(block);
         } else {
-            mp3ControllerManager.processBlock(block);
+            mp3ControllerManager.processBlock(block, bpm);
         }
     }
     void releaseResources() {}

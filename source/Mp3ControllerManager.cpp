@@ -43,6 +43,14 @@ Mp3ControllerManager::Mp3ControllerManager(juce::AudioProcessorValueTreeState& p
     parameters.addParameterListener(ERROR_PARAM_ID, this);
     parameters.addParameterListener(FRAME_SPEED_PARAM_ID, this);
     parameters.addParameterListener(SPECTRAL_GHOST_PARAM_ID, this);
+    parameters.addParameterListener(STUTTER_PARAM_ID, this);
+    parameters.addParameterListener(SMOOTH_PARAM_ID, this);
+    parameters.addParameterListener(SPEED_SYNC_PARAM_ID, this);
+    parameters.addParameterListener(SPEED_RATE_PARAM_ID, this);
+    parameters.addParameterListener(SPEED_RATE_SYNCED_PARAM_ID, this);
+    parameters.addParameterListener(STUTTER_SYNC_PARAM_ID, this);
+    parameters.addParameterListener(STUTTER_RATE_PARAM_ID, this);
+    parameters.addParameterListener(STUTTER_RATE_SYNCED_PARAM_ID, this);
 
     for (int i = 0; i < NUM_REASSIGNMENT_BANDS; ++i) {
         parameters.addParameterListener(BAND_ORDER_PARAM_IDS[i], this);
@@ -67,6 +75,14 @@ Mp3ControllerManager::~Mp3ControllerManager()
     parameters.removeParameterListener(ERROR_PARAM_ID, this);
     parameters.removeParameterListener(FRAME_SPEED_PARAM_ID, this);
     parameters.removeParameterListener(SPECTRAL_GHOST_PARAM_ID, this);
+    parameters.removeParameterListener(STUTTER_PARAM_ID, this);
+    parameters.removeParameterListener(SMOOTH_PARAM_ID, this);
+    parameters.removeParameterListener(SPEED_SYNC_PARAM_ID, this);
+    parameters.removeParameterListener(SPEED_RATE_PARAM_ID, this);
+    parameters.removeParameterListener(SPEED_RATE_SYNCED_PARAM_ID, this);
+    parameters.removeParameterListener(STUTTER_SYNC_PARAM_ID, this);
+    parameters.removeParameterListener(STUTTER_RATE_PARAM_ID, this);
+    parameters.removeParameterListener(STUTTER_RATE_SYNCED_PARAM_ID, this);
 
     for (int i = 0; i < NUM_REASSIGNMENT_BANDS; ++i) {
         parameters.removeParameterListener(BAND_ORDER_PARAM_IDS[i], this);
@@ -78,9 +94,22 @@ void Mp3ControllerManager::initialize (int _samplerate, int _initialBitrate, int
     std::memset(previousFrames, 0, 2 * 2 * 1152 * sizeof(float));
     std::memset(lastDecodedFrame, 0, sizeof(lastDecodedFrame));
     std::memset(ghostFrame, 0, sizeof(ghostFrame));
-    frameAccumulator = 1.f;
+    std::memset(previousOutputTail, 0, sizeof(previousOutputTail));
     samplerate = _samplerate;
     samplesPerBlock = _samplesPerBlock;
+
+    speedGate.prepare(samplerate);
+    stutterGate.prepare(samplerate);
+    prevSpeedFrozen = false;
+    prevStutterActive = false;
+    stutterCapturing = false;
+    stutterCapturedLength = 0;
+    stutterPlaybackPos = 0;
+    // Size the stutter capture buffer for the gate's worst-case period, plus
+    // one frame of padding since capture only advances in MP3FRAMESIZE steps.
+    const int maxCaptureSamples = (int) (RateGate::maxPeriodSeconds * samplerate) + MP3FRAMESIZE;
+    stutterCaptureL.assign(maxCaptureSamples, 0.f);
+    stutterCaptureR.assign(maxCaptureSamples, 0.f);
 
     // useful for debugging
     lameControllers[0].name = "lame0";
@@ -147,7 +176,7 @@ void Mp3ControllerManager::changeController(int bitrate, Encoder encoder)
     }
 }
 
-void Mp3ControllerManager::processBlock(juce::AudioBuffer<float>& buffer)
+void Mp3ControllerManager::processBlock(juce::AudioBuffer<float>& buffer, double bpm)
 {
     // if (parametersNeedUpdating) {
     //     updateParameters();
@@ -156,6 +185,16 @@ void Mp3ControllerManager::processBlock(juce::AudioBuffer<float>& buffer)
         return;
     }
     updateParameters();
+
+    speedGate.setBpm(bpm);
+    stutterGate.setBpm(bpm);
+    speedGate.setSynced(((juce::AudioParameterBool*) parameters.getParameter(SPEED_SYNC_PARAM_ID))->get());
+    speedGate.setFreeRateHz(((juce::AudioParameterFloat*) parameters.getParameter(SPEED_RATE_PARAM_ID))->get());
+    speedGate.setSyncedDivisionIndex(((juce::AudioParameterChoice*) parameters.getParameter(SPEED_RATE_SYNCED_PARAM_ID))->getIndex());
+    stutterGate.setSynced(((juce::AudioParameterBool*) parameters.getParameter(STUTTER_SYNC_PARAM_ID))->get());
+    stutterGate.setFreeRateHz(((juce::AudioParameterFloat*) parameters.getParameter(STUTTER_RATE_PARAM_ID))->get());
+    stutterGate.setSyncedDivisionIndex(((juce::AudioParameterChoice*) parameters.getParameter(STUTTER_RATE_SYNCED_PARAM_ID))->getIndex());
+
     auto samplesL = buffer.getWritePointer(0);
     auto samplesR = buffer.getWritePointer(1);
 
@@ -194,19 +233,58 @@ void Mp3ControllerManager::processBlock(juce::AudioBuffer<float>& buffer)
             currentController->processFrame(frameIn[0], frameIn[1], frameOut[0], frameOut[1]);
         }
 
-        // Frame speed: advance to a new decoded frame only when accumulator crosses 1.0.
-        // When repeating, the codec still encodes+decodes (keeping codec state healthy)
-        // but we discard the fresh output and reuse the last one.
-        float speed = ((juce::AudioParameterFloat*)parameters.getParameter(FRAME_SPEED_PARAM_ID))->get();
-        frameAccumulator += speed;
-        if (frameAccumulator >= 1.f) {
-            frameAccumulator -= 1.f;
-            std::memcpy(lastDecodedFrame, frameOut, sizeof(frameOut));
-        } else {
-            // Re-encode/decode to keep codec state consistent, discard output
+        bool discontinuity = false;
+
+        // Speed: tempo-syncable freeze gate. Knob value 1 = always fresh
+        // (normal), 0 = always frozen on lastDecodedFrame, in both free and
+        // synced modes. The codec still encodes+decodes every frame even
+        // while frozen, keeping its internal state healthy; we just discard
+        // the fresh output and reuse the last one.
+        float speedAmount = ((juce::AudioParameterFloat*)parameters.getParameter(FRAME_SPEED_PARAM_ID))->get();
+        bool speedFrozen = speedGate.advanceFrameAndIsActive(MP3FRAMESIZE, 1.f - speedAmount);
+        if (speedFrozen) {
             currentController->processFrame(frameIn[0], frameIn[1], nullptr, nullptr);
             std::memcpy(frameOut, lastDecodedFrame, sizeof(frameOut));
+        } else {
+            std::memcpy(lastDecodedFrame, frameOut, sizeof(frameOut));
         }
+        discontinuity |= (speedFrozen != prevSpeedFrozen);
+        prevSpeedFrozen = speedFrozen;
+
+        // Stutter: tempo-syncable buffer-repeat gate. On entering the active
+        // phase, captures roughly a quarter of that phase's audio (at least
+        // one frame), then loops the captured chunk for the remainder of the
+        // active phase before releasing back to fresh audio.
+        float stutterAmount = ((juce::AudioParameterFloat*)parameters.getParameter(STUTTER_PARAM_ID))->get();
+        bool stutterActive = stutterGate.advanceFrameAndIsActive(MP3FRAMESIZE, stutterAmount);
+        if (stutterActive) {
+            if (!prevStutterActive) {
+                double activePhaseSamples = stutterGate.periodSamples() * stutterAmount;
+                stutterCaptureTarget = std::max(MP3FRAMESIZE, (int) (activePhaseSamples * 0.25));
+                stutterCaptureTarget = std::min(stutterCaptureTarget, (int) stutterCaptureL.size() - MP3FRAMESIZE);
+                stutterCapturedLength = 0;
+                stutterCapturing = true;
+            }
+            if (stutterCapturing) {
+                std::memcpy(&stutterCaptureL[stutterCapturedLength], frameOut[0], MP3FRAMESIZE * sizeof(float));
+                std::memcpy(&stutterCaptureR[stutterCapturedLength], frameOut[1], MP3FRAMESIZE * sizeof(float));
+                stutterCapturedLength += MP3FRAMESIZE;
+                stutterPlaybackPos = 0;
+                if (stutterCapturedLength >= stutterCaptureTarget) {
+                    stutterCapturing = false;
+                }
+            } else {
+                for (int s = 0; s < MP3FRAMESIZE; ++s) {
+                    frameOut[0][s] = stutterCaptureL[(stutterPlaybackPos + s) % stutterCapturedLength];
+                    frameOut[1][s] = stutterCaptureR[(stutterPlaybackPos + s) % stutterCapturedLength];
+                }
+                stutterPlaybackPos = (stutterPlaybackPos + MP3FRAMESIZE) % stutterCapturedLength;
+            }
+        } else {
+            stutterCapturing = false;
+        }
+        discontinuity |= (stutterActive != prevStutterActive);
+        prevStutterActive = stutterActive;
 
         // Spectral ghost: blend current frame with the previous ghosted frame
         float ghost = ((juce::AudioParameterFloat*)parameters.getParameter(SPECTRAL_GHOST_PARAM_ID))->get();
@@ -217,6 +295,11 @@ void Mp3ControllerManager::processBlock(juce::AudioBuffer<float>& buffer)
             }
         }
         std::memcpy(ghostFrame, frameOut, sizeof(frameOut));
+
+        // Smooth: crossfade away clicks from the Speed/Stutter hard frame
+        // swaps above, then capture this frame's true tail for next time.
+        applySmoothing(frameOut, discontinuity);
+        captureOutputTail(frameOut);
 
         for (auto s = 0; s < MP3FRAMESIZE; ++s) {
             outputBufferL->enqueue(frameOut[0][s]);
@@ -233,6 +316,31 @@ void Mp3ControllerManager::processBlock(juce::AudioBuffer<float>& buffer)
     }
     for (auto s = 0; s < buffer.getNumSamples(); ++s) {
         samplesR[s] = outputBufferR->dequeue();
+    }
+}
+
+void Mp3ControllerManager::applySmoothing(float frameOut[2][MP3FRAMESIZE], bool discontinuity)
+{
+    if (!discontinuity) {
+        return;
+    }
+    float smooth = ((juce::AudioParameterFloat*)parameters.getParameter(SMOOTH_PARAM_ID))->get();
+    int rampSamples = (int) (smooth * (float) maxSmoothRampSamples);
+    if (rampSamples <= 0) {
+        return;
+    }
+    for (int ch = 0; ch < 2; ++ch) {
+        for (int i = 0; i < rampSamples; ++i) {
+            float inc = (float) i / (float) rampSamples;
+            frameOut[ch][i] = (1.f - inc) * previousOutputTail[ch][i] + inc * frameOut[ch][i];
+        }
+    }
+}
+
+void Mp3ControllerManager::captureOutputTail(const float frameOut[2][MP3FRAMESIZE])
+{
+    for (int ch = 0; ch < 2; ++ch) {
+        std::memcpy(previousOutputTail[ch], &frameOut[ch][MP3FRAMESIZE - maxSmoothRampSamples], maxSmoothRampSamples * sizeof(float));
     }
 }
 

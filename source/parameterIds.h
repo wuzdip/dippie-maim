@@ -54,6 +54,24 @@ const juce::String ERROR_PARAM_ID = "error";
 
 const juce::String FRAME_SPEED_PARAM_ID = "framespeed";
 const juce::String SPECTRAL_GHOST_PARAM_ID = "spectralghost";
+const juce::String STUTTER_PARAM_ID = "stutter";
+const juce::String SMOOTH_PARAM_ID = "smooth";
+
+const juce::String SPEED_SYNC_PARAM_ID = "speedsync";
+const juce::String SPEED_RATE_PARAM_ID = "speedrate";
+const juce::String SPEED_RATE_SYNCED_PARAM_ID = "speedratesynced";
+
+const juce::String STUTTER_SYNC_PARAM_ID = "stuttersync";
+const juce::String STUTTER_RATE_PARAM_ID = "stutterrate";
+const juce::String STUTTER_RATE_SYNCED_PARAM_ID = "stutterratesynced";
+
+const juce::StringArray SYNCED_RATE_DIVISIONS = {
+    "1/1", "1/2", "1/4", "1/4D", "1/8", "1/8D", "1/8T", "1/16", "1/16T"
+};
+// Number of quarter-note beats each division above represents, same order.
+const std::array<float, 9> SYNCED_RATE_BEATS = {
+    4.f, 2.f, 1.f, 1.5f, 0.5f, 0.75f, (1.f / 3.f), 0.25f, (1.f / 6.f)
+};
 
 const juce::String BITRATE_PARAM_ID = "bitrate";
 const juce::String ENCODER_PARAM_ID = "encoder";

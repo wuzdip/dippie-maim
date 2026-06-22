@@ -14,6 +14,7 @@
 #include <juce_graphics/juce_graphics.h>
 
 #include "EncoderBitrateSection.h"
+#include "GlitchFXSection.h"
 #include "MDCTGraphSection.h"
 #include "MiscellaneaSection.h"
 #include "OpusPacketLossSection.h"
@@ -21,13 +22,14 @@
 #include "ReassignmentSection.h"
 #include "StageWindow.h"
 #include "TitlePanel.h"
+#include "../SpectrogramDataSource.h"
 //==============================================================================
 /*
 */
 class MainArea  : public juce::Component, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
-    MainArea(juce::AudioProcessorValueTreeState& p);
+    MainArea(juce::AudioProcessorValueTreeState& p, SpectrogramDataSource& spectrogramSource);
     ~MainArea() override;
 
     void paint (juce::Graphics&) override;
@@ -43,6 +45,7 @@ private:
     TitlePanel titlePanel;
     ReassignmentSection reassignmentSection;
     OpusPacketLossSection opusPacketLossSection;
+    GlitchFXSection glitchFXSection;
 
     juce::AudioProcessorValueTreeState& parameters;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainArea)

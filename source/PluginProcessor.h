@@ -16,6 +16,7 @@
 #include <string>
 
 #include "CodecControllerManager.h"
+#include "SpectrogramDataSource.h"
 
 //==============================================================================
 
@@ -68,6 +69,8 @@ public:
     juce::AudioProcessorValueTreeState& getValueTreeState();
     void parameterChanged (const juce::String &parameterID, float newValue) override;
 
+    SpectrogramDataSource& getSpectrogramDataSource() { return spectrogramDataSource; }
+
 private:
     juce::AudioProcessorValueTreeState parameters;
     void processBlockStereo(juce::AudioBuffer<float>& buffer);
@@ -87,6 +90,7 @@ private:
     std::atomic<bool> parametersNeedUpdating;
 
     CodecControllerManager codecControllerManager;
+    SpectrogramDataSource spectrogramDataSource;
         
     std::array<juce::IIRFilter, 2> postFilterLo;
     std::array<juce::IIRFilter, 2> postFilterHi;
