@@ -72,8 +72,9 @@ jobs:
     - name: Install IPP (Windows)
       if: (runner.os == 'Windows') && (steps.cache-ipp.outputs.cache-hit != 'true')
       shell: bash
+      continue-on-error: true
       run: |
-        curl --output oneapi.exe https://registrationcenter-download.intel.com/akdlm/irc_nas/19078/w_BaseKit_p_2023.0.0.25940_offline.exe
+        curl --fail --output oneapi.exe https://registrationcenter-download.intel.com/akdlm/irc_nas/19078/w_BaseKit_p_2023.0.0.25940_offline.exe
         ./oneapi.exe -s -x -f oneapi
         ./oneapi/bootstrapper.exe -s -c --action install --components=intel.oneapi.win.ipp.devel --eula=accept -p=NEED_VS2022_INTEGRATION=1 --log-dir=.
 
