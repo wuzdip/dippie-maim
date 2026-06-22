@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug)",
+      "Bash(cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLAME_LIB=lib/lame/libmp3lame/.libs/libmp3lame.a -DPRODUCT_NAME=Dippie_maim -DFORMATS=VST3)"
+    ]
+  }
+}

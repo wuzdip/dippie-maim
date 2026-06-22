@@ -1,0 +1,75 @@
+# Juce stuff
+Maim/Builds
+Maim/JuceLibraryCode
+Maim/maim\ audiohost\ setup.filtergraph
+
+# This project's actual build output dir
+/build
+
+cmake-build-*
+Packages.dmg
+.idea
+packaging/build
+packaging/plugins
+**.dmg
+
+# Audio stuff
+**/*.wav
+**/*.mp3
+**/*.flac
+!assets/*.wav
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+**/*.o
+**/*.a
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+**/*.la
+**/*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+Maim/lib/lame/frontend/lame
+Maim/lib/blade/bladeenc/bladeenc
+
+# misc
+**/.DS_Store
+**/*.asd
+**/*.dSYM
+Maim/lib/blade/test
+
+# lame stuff (this repo's actual path is lib/lame, not Source/lib/lame)
+/lib/lame/**/Makefile
+/lib/lame/**/*.Po
+/lib/lame/**/*.Plo
+lib/lame/config.log
+lib/lame/config.h
+lib/lame/config.status
+lib/lame/libtool
+
+venv
+lib/lame/stamp-h1
+lib/lame/lame.spec

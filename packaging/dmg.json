@@ -1,0 +1,6 @@
+{
+  "title": "Maim",
+  "contents": [
+    { "x": 50, "y": 50, "type": "file", "path": "build/Maim.pkg" }
+  ]
+}
